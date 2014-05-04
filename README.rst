@@ -22,14 +22,46 @@ Tests can be run with: ``python setup.py test``
 
 To sign a warc:
 
-``warc-sign privatekey.pem warc.warc.gz``
+``warc-sign privatekey.pem my-warc-file.warc.gz``
 
 To verify that a warc has been signed:
 
-``warc-verify publickey.pem warc.warc.gz``
+``warc-verify publickey.pem my-warc-file.warc.gz``
 
+
+API Usage
+~~~~~~~~~
+
+warcsigner can be used from other scripts.
+To sign a warc:
+
+::
+
+  from warcsigner.warcsigner import RSASigner
+  
+  signer = RSASigner(private_key_file='privatekey.pem')
+  
+  if signer.sign('my-warc-file.warc.gz'):
+      # warc signed successfully
+  
+
+or to verify:
+
+::
+
+  from warcsigner.warcsigner import RSASigner
+  
+  signer = RSASigner(public_key_file='publickey.pem')
+  
+  if signer.verify('my-warc-file.warc.gz'):
+      # signature verified
+  else:
+      # signature not found/invalid
+  
 
 Public/Private keys are expected to be in .PEM format
+See the `python-rsa formats doc <http://stuvel.eu/files/python-rsa-doc/compatibility.html>`_ for more information
+on supported key formats.
 
 
 How it works
