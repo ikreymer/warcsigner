@@ -1,6 +1,13 @@
 Warc-Signer 0.0.1
 ====================
 
+.. image:: https://travis-ci.org/ikreymer/warcsigner.svg?branch=master
+  :target: https://travis-ci.org/ikreymer/warcsigner
+
+.. image:: https://coveralls.io/repos/ikreymer/warcsigner/badge.png
+  :target: https://coveralls.io/r/ikreymer/warcsigner
+
+
 Tools to add and a verify a cryptographic signature to WARC (or any gzip-chunked) files
 
 This package provides complemetary ``warc-sign`` tool which signs WARC(s) with an RSA signature and 
