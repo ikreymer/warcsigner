@@ -57,6 +57,26 @@ or to verify:
       # signature verified
   else:
       # signature not found/invalid
+
+
+the ``sign`` and ``verify`` methods can take either a filename string or a file-like 
+stream object (an object with a ``read`` method)
+
+(There are also ``sign_stream`` and ``verify_stream`` methods which operate directly on file-like
+streams)
+
+
+Additionally, upon verification, the signature can be removed:
+
+::
+  if signer.verify('my-warc-file.warc.gz', remove=True):
+      # signature verified and removed
+
+  assert signer.verify('my-warc-file.warc.gz') == False
+
+If the first verify succeeds, the signature will be removed and file truncated
+to its previous pre-signature size. (The file is unaltered if the verification fails).
+This may be useful if planning to append to the WARC and then resigning it.
   
 
 Public/Private keys are expected to be in .PEM format
@@ -70,7 +90,7 @@ How it works
 The `python-rsa <http://stuvel.eu/rsa>`_ library is used to sign and verify the signature.
 
 The signature is stored in an extra gzip chunk containing no data but using `custom extra field <http://www.gzip.org/zlib/rfc-gzip.html#extra>`_ 
-to store the signature. This allows the verify tool to quickly access the signature by checking a fixed offset from the end of the warc.
+to store the signature. This allows the verify tool to quickly access the signature by checking a fixed offset from the end of the WARC.
 
 When decompressing gzip chunks, there should be no detectable difference as most gzip tools ignore the extra gzip header.
 

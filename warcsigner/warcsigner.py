@@ -3,6 +3,7 @@ from gzipmeta import write_metadata, read_metadata, size_of_header
 import rsa
 import math
 import sys
+import os
 
 from argparse import ArgumentParser
 
@@ -92,36 +93,63 @@ class RSASigner(object):
         else:
             self.pub_key = None
 
-    def sign(self, filename):
-        with open(filename, 'rb') as fh:
-            signature = rsa.sign(fh, self.priv_key, 'SHA-1')
+    def sign(self, file_):
+        if hasattr(file_, 'read'):
+            return self.sign_stream(file_)
+        else:
+            if not os.path.isfile(file_):
+                return False
+
+            with open(file_, 'a+') as fh:
+                return self.sign_stream(fh)
+
+    def sign_stream(self, fh):
+        fh.seek(0)
+        signature = rsa.sign(fh, self.priv_key, 'SHA-1')
 
         rsa_meta = RSAMetadata(signature)
 
-        with open(filename, 'ab') as fh:
-            write_metadata(fh, rsa_meta)
-            fh.flush()
+        write_metadata(fh, rsa_meta)
 
+        fh.flush()
         return True
 
-    def verify(self, filename):
+    def verify(self, file_, remove=False):
+        if hasattr(file_, 'read'):
+            return self.verify_stream(file_, remove)
+        else:
+            if not os.path.isfile(file_):
+                return False
+
+            mod = 'r' if not remove else 'a+'
+
+            with open(file_, mod) as fh:
+                return self.verify_stream(fh, remove)
+
+    def verify_stream(self, fh, remove=False):
         size = numbits(self.pub_key.n)
 
         rsa_meta = RSAMetadata(size=size)
         sig_header = size_of_header(rsa_meta)
 
-        with open(filename, 'rb') as fh:
+        try:
             fh.seek(-sig_header, 2)
+        except IOError:
+            return False
 
-            if not read_metadata(fh, rsa_meta):
-                return False
+        if not read_metadata(fh, rsa_meta):
+            return False
 
-            fh.seek(0, 2)
-            total_len = fh.tell() - sig_header
+        fh.seek(0, 2)
+        total_len = fh.tell() - sig_header
 
-            fh.seek(0)
-            lim = LimitReader(fh, total_len)
-            return rsa.verify(lim, rsa_meta.signature, self.pub_key)
+        fh.seek(0)
+        lim = LimitReader(fh, total_len)
+        result = rsa.verify(lim, rsa_meta.signature, self.pub_key)
+        if result and remove:
+            fh.truncate(total_len)
+
+        return result
 
 
 #=================================================================
@@ -141,11 +169,7 @@ def sign_cli(args=None):
     errs = False
 
     for input_ in cmd.inputs:
-        res = False
-        try:
-            res = signer.sign(input_)
-        except Exception as e:
-            print e
+        res = signer.sign(input_)
 
         if res:
             print 'Signed ', input_
@@ -173,11 +197,7 @@ def verify_cli(args=None):
     errs = False
 
     for input_ in cmd.inputs:
-        res = False
-        try:
-            res = signer.verify(input_)
-        except Exception as e:
-            print e
+        res = signer.verify(input_)
 
         if res:
             print 'Verified ', input_
