@@ -145,7 +145,11 @@ class RSASigner(object):
 
         fh.seek(0)
         lim = LimitReader(fh, total_len)
-        result = rsa.verify(lim, rsa_meta.signature, self.pub_key)
+        try:
+            result = rsa.verify(lim, rsa_meta.signature, self.pub_key)
+        except rsa.pkcs1.VerificationError:
+            return False
+
         if result and remove:
             fh.truncate(total_len)
 

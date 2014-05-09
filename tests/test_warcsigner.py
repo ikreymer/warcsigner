@@ -16,6 +16,7 @@ EMPTY_FILE = abs_path('empty.warc.gz')
 
 PRIVATE_KEY = abs_path('test_private_key.pem')
 PUBLIC_KEY = abs_path('test_public_key.pem')
+PUBLIC_WRONG_KEY = abs_path('test_wrong_key.pem')
 
 
 class TestWarcSigner(object):
@@ -31,8 +32,12 @@ class TestWarcSigner(object):
 
         assert self.signer.sign(TEMP_SIGNED_WARC) == True
 
-        # signed
+        # verify signed
         assert self.signer.verify(TEMP_SIGNED_WARC) == True
+
+        # verify against wrong key
+        wrong_signer = RSASigner(public_key_file=PUBLIC_WRONG_KEY)
+        assert wrong_signer.verify(TEMP_SIGNED_WARC) == False
 
         # signature added to warc size
         assert os.path.getsize(TEMP_SIGNED_WARC) > orig_size
@@ -55,6 +60,9 @@ class TestWarcSigner(object):
         shutil.copyfile(TEST_WARC, TEMP_SIGNED_WARC)
         assert sign_cli([PRIVATE_KEY, TEMP_SIGNED_WARC]) == 0
         assert verify_cli([PUBLIC_KEY, TEMP_SIGNED_WARC]) == 0
+
+        # wrong key
+        assert verify_cli([PUBLIC_WRONG_KEY, TEMP_SIGNED_WARC]) == 1
 
         # not signed
         assert verify_cli([PUBLIC_KEY, TEST_WARC]) == 1
