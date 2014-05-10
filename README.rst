@@ -69,6 +69,7 @@ streams)
 Additionally, upon verification, the signature can be removed:
 
 ::
+
   if signer.verify('my-warc-file.warc.gz', remove=True):
       # signature verified and removed
 
