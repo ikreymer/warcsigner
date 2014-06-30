@@ -65,6 +65,7 @@ stream object (an object with a ``read`` method)
 Additionally, upon verification, the signature can be removed:
 
 ::
+
   if signer.verify('my-warc-file.warc.gz', remove=True):
       # signature verified and removed
 
