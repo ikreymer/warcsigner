@@ -146,9 +146,22 @@ def read_length_metadata(fh):
 
 
 #=================================================================
-def read_metadata(fh, metadata):
+def read_metadata(fh, metadata, seek=True):
     try:
-        fh.seek(-14 - metadata.size(), 2)
+        if seek:
+            fh.seek(-14 - metadata.size(), 2)
+        else:
+            assert fh.read(len(MAGIC_HEADER)) == MAGIC_HEADER
+            assert fh.read(len(FLAGS)) == FLAGS
+
+            # ignore timestamp
+            buff = read32(fh)
+
+            assert fh.read(len(XFL_OS)) == XFL_OS
+
+            # total length
+            assert read16(fh) == (metadata.size() + 4)
+
         buff = fh.read(2)
         assert buff == metadata.id()[:2]
 

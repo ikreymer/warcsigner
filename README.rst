@@ -1,4 +1,4 @@
-Warc-Signer 0.1.0
+Warc-Signer 0.2.0
 ====================
 
 .. image:: https://travis-ci.org/ikreymer/warcsigner.svg?branch=master
@@ -62,10 +62,6 @@ or to verify:
 the ``sign`` and ``verify`` methods can take either a filename string or a file-like 
 stream object (an object with a ``read`` method)
 
-(There are also ``sign_stream`` and ``verify_stream`` methods which operate directly on file-like
-streams)
-
-
 Additionally, upon verification, the signature can be removed:
 
 ::
@@ -77,7 +73,20 @@ Additionally, upon verification, the signature can be removed:
 If the first verify succeeds, the signature will be removed and file truncated
 to its previous pre-signature size. (The file is unaltered if the verification fails).
 This may be useful if planning to append to the WARC and then resigning it.
-  
+
+Streaming and ``seek()``
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is possible to use a file-like object which supports a ``read()`` instead of a filename.
+
+When a WARC is signed, the signature is appended to the end of the file.
+
+When verifying a file, the ``seek()`` may be used to determine the file size and the position of the signature.
+However, if a ``size=`` param is added to ``verify`` or ``verify_stream`` calls, no seek() calls are made during
+the verification and the file-like object is consumed linearly. This is specially useful
+when streaming a file from a remote location and ``seek()`` is not available. 
+The total file size must be provided, though.
+
 
 Public/Private keys are expected to be in .PEM format
 See the `python-rsa formats doc <http://stuvel.eu/files/python-rsa-doc/compatibility.html>`_ for more information

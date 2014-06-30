@@ -24,6 +24,8 @@ class TestWarcSigner(object):
         self.signer = RSASigner(private_key_file=PRIVATE_KEY,
                                 public_key_file=PUBLIC_KEY)
 
+        self.wrong_signer = RSASigner(public_key_file=PUBLIC_WRONG_KEY)
+
     def test_sign_verify_remove(self):
         shutil.copyfile(TEST_WARC, TEMP_SIGNED_WARC)
 
@@ -36,8 +38,7 @@ class TestWarcSigner(object):
         assert self.signer.verify(TEMP_SIGNED_WARC) == True
 
         # verify against wrong key
-        wrong_signer = RSASigner(public_key_file=PUBLIC_WRONG_KEY)
-        assert wrong_signer.verify(TEMP_SIGNED_WARC) == False
+        assert self.wrong_signer.verify(TEMP_SIGNED_WARC) == False
 
         # signature added to warc size
         assert os.path.getsize(TEMP_SIGNED_WARC) > orig_size
@@ -95,3 +96,34 @@ class TestWarcSigner(object):
             assert self.signer.sign(temp) == True
             assert self.signer.verify(temp) == True
 
+    def test_stream_noseek(self):
+        with tempfile.TemporaryFile() as temp:
+            temp.write('ABCDEF')
+            assert self.signer.sign(temp) == True
+
+            # compute size and reset
+            temp.seek(0, 2)
+            total_len = temp.tell()
+
+            # no seeking in verify
+            temp.seek(0)
+            assert self.signer.verify(temp, size=total_len) == True
+
+            # unsigned portion
+            temp.seek(0)
+            assert self.signer.verify(temp, size=6) == False
+
+            # wrong key
+            temp.seek(0)
+            assert self.wrong_signer.verify(temp, size=total_len) == False
+
+            # incorrect name
+            temp.seek(0)
+            assert self.signer.verify(temp, size=total_len,
+                                      hash_type='SHA-256') == False
+
+            # modify stream
+            temp.seek(0)
+            temp.write('X')
+            temp.seek(0)
+            assert self.signer.verify(temp, size=total_len) == False

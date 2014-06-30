@@ -7,6 +7,11 @@ import os
 
 from argparse import ArgumentParser
 
+from rsa.pkcs1 import VerificationError
+
+
+DEFAULT_HASH_TYPE = 'SHA-1'
+
 
 #=================================================================
 def numbits(x):
@@ -93,19 +98,19 @@ class RSASigner(object):
         else:
             self.pub_key = None
 
-    def sign(self, file_):
+    def sign(self, file_, hash_type=DEFAULT_HASH_TYPE):
         if hasattr(file_, 'read'):
-            return self.sign_stream(file_)
+            return self.sign_stream(file_, hash_type)
         else:
             if not os.path.isfile(file_):
                 return False
 
             with open(file_, 'a+') as fh:
-                return self.sign_stream(fh)
+                return self.sign_stream(fh, hash_type)
 
-    def sign_stream(self, fh):
+    def sign_stream(self, fh, hash_type):
         fh.seek(0)
-        signature = rsa.sign(fh, self.priv_key, 'SHA-1')
+        signature = rsa.sign(fh, self.priv_key, hash_type)
 
         rsa_meta = RSAMetadata(signature)
 
@@ -114,9 +119,13 @@ class RSASigner(object):
         fh.flush()
         return True
 
-    def verify(self, file_, remove=False):
+    def verify(self, file_, size=None, remove=False,
+               hash_type=DEFAULT_HASH_TYPE):
         if hasattr(file_, 'read'):
-            return self.verify_stream(file_, remove)
+            if size is not None:
+                return self.verify_stream_data(file_, size, hash_type)
+            else:
+                return self.verify_stream(file_, remove)
         else:
             if not os.path.isfile(file_):
                 return False
@@ -147,13 +156,78 @@ class RSASigner(object):
         lim = LimitReader(fh, total_len)
         try:
             result = rsa.verify(lim, rsa_meta.signature, self.pub_key)
-        except rsa.pkcs1.VerificationError:
+        except VerificationError:
             return False
 
         if result and remove:
             fh.truncate(total_len)
 
         return result
+
+    def verify_stream_data(self, fh, total_len, hash_type):
+        size = numbits(self.pub_key.n)
+
+        rsa_meta = RSAMetadata(size=size)
+        sig_header = size_of_header(rsa_meta)
+        total_len -= sig_header
+
+        lim = LimitReader(fh, total_len)
+
+        def read_sig():
+            if not read_metadata(fh, rsa_meta, seek=False):
+                return False
+
+            return rsa_meta.signature
+
+        try:
+            result = _rsa_streaming_verify(lim, read_sig,
+                                           self.pub_key, hash_type)
+        except VerificationError:
+            return False
+
+        return result
+
+
+#=================================================================
+def _rsa_streaming_verify(fh, sig_func, pub_key, hash_type):
+
+    # Compute hash first, using given type
+    message_hash = rsa.pkcs1._hash(fh, hash_type)
+
+    # Compute signature given sig_func(), presumably
+    # reading rest of stream
+    signature = sig_func()
+
+    if not signature:
+        raise VerificationError('Verification failed')
+
+    # Below is copy of rest of rsa.verify() to check the signature
+    # ------------------------------------------------------------
+    blocksize = rsa.common.byte_size(pub_key.n)
+    encrypted = rsa.transform.bytes2int(signature)
+    decrypted = rsa.core.decrypt_int(encrypted, pub_key.e, pub_key.n)
+    clearsig = rsa.transform.int2bytes(decrypted, blocksize)
+
+    # If we can't find the signature  marker, verification failed.
+    if clearsig[0:2] != rsa._compat.b('\x00\x01'):
+        raise VerificationError('Verification failed')
+
+    # Find the 00 separator between the padding and the payload
+    try:
+        sep_idx = clearsig.index(rsa._compat.b('\x00'), 2)
+    except ValueError:  # pragma: no cover (part of rsa.verify())
+        raise VerificationError('Verification failed')
+
+    # Get the hash method and and signature
+    (actual_hash_type, signature_hash) = (rsa.pkcs1.
+        _find_method_hash(clearsig[sep_idx + 1:]))
+
+    # Compare the real hash to the hash in the signature
+    if message_hash != signature_hash or hash_type != actual_hash_type:
+        raise VerificationError('Verification failed')
+
+    # end rsa.verify() --------------------------------------------
+    return True
 
 
 #=================================================================
