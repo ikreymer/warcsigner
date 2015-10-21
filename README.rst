@@ -4,7 +4,7 @@ Warc-Signer 0.2.0
 .. image:: https://travis-ci.org/ikreymer/warcsigner.svg?branch=master
   :target: https://travis-ci.org/ikreymer/warcsigner
 
-.. image:: https://coveralls.io/repos/ikreymer/warcsigner/badge.png
+.. image:: https://coveralls.io/repos/ikreymer/warcsigner/badge.svg
   :target: https://coveralls.io/r/ikreymer/warcsigner
 
 
@@ -92,6 +92,12 @@ The total file size must be provided, though.
 Public/Private keys are expected to be in .PEM format
 See the `python-rsa formats doc <http://stuvel.eu/files/python-rsa-doc/compatibility.html>`_ for more information
 on supported key formats.
+
+Original Stream
+~~~~~~~~~~~~~~~
+
+In certain situations, it may be useful to return the original, unsigned stream from a signed stream.
+``signer.get_unsigned_stream(stream, size)`` will return a wrapper for `stream` which will not include the signature (if present). This is useful if concatenating WARCs without including a signature (and empty record) for each one.
 
 
 How it works
