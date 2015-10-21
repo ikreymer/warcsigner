@@ -5,6 +5,7 @@ import shutil
 import os
 import tempfile
 
+from io import BytesIO
 
 def abs_path(filename):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), filename)
@@ -105,6 +106,15 @@ class TestWarcSigner(object):
             temp.seek(0, 2)
             total_len = temp.tell()
 
+            # read unsigned stream
+            temp.seek(0)
+            uns = self.signer.get_unsigned_stream(temp, total_len=total_len)
+            buff = BytesIO()
+            buff.write(uns.read())
+            buff.write(uns.read())
+            assert uns.read() == ''
+            assert buff.getvalue() == 'ABCDEF'
+
             # no seeking in verify
             temp.seek(0)
             assert self.signer.verify(temp, size=total_len) == True
@@ -127,3 +137,22 @@ class TestWarcSigner(object):
             temp.write('X')
             temp.seek(0)
             assert self.signer.verify(temp, size=total_len) == False
+
+    def test_unsigned_stream_noseek(self):
+        with tempfile.TemporaryFile() as temp:
+            temp.write('ABCDEF' * 30)
+
+            # compute size and reset
+            temp.seek(0, 2)
+            total_len = temp.tell()
+
+            # read unsigned stream
+            temp.seek(0)
+            uns = self.signer.get_unsigned_stream(temp, total_len=total_len)
+            buff = BytesIO()
+            buff.write(uns.read())
+            buff.write(uns.read())
+            assert uns.read() == ''
+            assert buff.getvalue() == ('ABCDEF' * 30)
+
+

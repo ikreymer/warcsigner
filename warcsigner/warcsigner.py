@@ -6,6 +6,7 @@ import sys
 import os
 
 from argparse import ArgumentParser
+from io import BytesIO
 
 from rsa.pkcs1 import VerificationError
 
@@ -66,7 +67,7 @@ class LimitReader(object):
         self.stream = stream
         self.limit = limit
 
-    def read(self, length):
+    def read(self, length=8192):
         length = min(length, self.limit)
         if length == 0:
             return ''
@@ -74,6 +75,29 @@ class LimitReader(object):
         buff = self.stream.read(length)
         self.limit -= len(buff)
         return buff
+
+
+#=================================================================
+class UnsignedStream(LimitReader):
+    def __init__(self, stream, unsigned_len, rsa_meta):
+        super(UnsignedStream, self).__init__(stream, unsigned_len)
+        self.rsa_meta = rsa_meta
+
+    def read(self, length=8192):
+        buff = super(UnsignedStream, self).read(length)
+        if buff:
+            return buff
+
+        # check that remainder is actually a signature
+        buff = self.stream.read()
+        if not buff:
+            return ''
+
+        # if not, just return buff
+        if not read_metadata(BytesIO(buff), self.rsa_meta, seek=False):
+            return buff
+
+        return ''
 
 
 #=================================================================
@@ -187,6 +211,17 @@ class RSASigner(object):
 
         return result
 
+    def get_unsigned_stream(self, fh, total_len, hash_type=DEFAULT_HASH_TYPE):
+        """ Return a stream that truncates the signature, if present
+        """
+        size = numbits(self.pub_key.n)
+
+        rsa_meta = RSAMetadata(size=size)
+        sig_header = size_of_header(rsa_meta)
+        total_len -= sig_header
+
+        return UnsignedStream(fh, total_len, rsa_meta)
+
 
 #=================================================================
 def _rsa_streaming_verify(fh, sig_func, pub_key, hash_type):
@@ -268,6 +303,10 @@ def verify_cli(args=None):
     parser.add_argument('inputs', nargs='+',
                         help='one or more files to verify')
 
+
+    parser.add_argument('-r', '--remove', help='remove verification signature',
+                        action='store_true')
+
     cmd = parser.parse_args(args=args)
 
     signer = RSASigner(public_key_file=cmd.public_key)
@@ -275,7 +314,7 @@ def verify_cli(args=None):
     errs = False
 
     for input_ in cmd.inputs:
-        res = signer.verify(input_)
+        res = signer.verify(input_, remove=cmd.remove is not None)
 
         if res:
             print 'Verified ', input_
