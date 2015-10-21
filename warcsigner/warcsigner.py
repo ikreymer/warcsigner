@@ -159,12 +159,15 @@ class RSASigner(object):
             with open(file_, mod) as fh:
                 return self.verify_stream(fh, remove)
 
-    def verify_stream(self, fh, remove=False):
+    def get_rsa_metadata(self):
         size = numbits(self.pub_key.n)
 
         rsa_meta = RSAMetadata(size=size)
         sig_header = size_of_header(rsa_meta)
+        return sig_header, rsa_meta
 
+    def verify_stream(self, fh, remove=False):
+        sig_header, rsa_meta = self.get_rsa_metadata()
         try:
             fh.seek(-sig_header, 2)
         except IOError:
@@ -189,10 +192,8 @@ class RSASigner(object):
         return result
 
     def verify_stream_data(self, fh, total_len, hash_type):
-        size = numbits(self.pub_key.n)
+        sig_header, rsa_meta = self.get_rsa_metadata()
 
-        rsa_meta = RSAMetadata(size=size)
-        sig_header = size_of_header(rsa_meta)
         total_len -= sig_header
 
         lim = LimitReader(fh, total_len)
@@ -214,10 +215,7 @@ class RSASigner(object):
     def get_unsigned_stream(self, fh, total_len, hash_type=DEFAULT_HASH_TYPE):
         """ Return a stream that truncates the signature, if present
         """
-        size = numbits(self.pub_key.n)
-
-        rsa_meta = RSAMetadata(size=size)
-        sig_header = size_of_header(rsa_meta)
+        sig_header, rsa_meta = self.get_rsa_metadata()
         total_len -= sig_header
 
         return UnsignedStream(fh, total_len, rsa_meta)

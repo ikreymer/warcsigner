@@ -1,4 +1,4 @@
-Warc-Signer 0.3.0
+Warc-Signer 0.3.1
 =================
 
 .. image:: https://travis-ci.org/ikreymer/warcsigner.svg?branch=master

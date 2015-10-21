@@ -24,7 +24,7 @@ class PyTest(TestCommand):
 
 setup(
     name='warcsigner',
-    version='0.3.0',
+    version='0.3.1',
     url='https://github.com/ikreymer/warcsigner',
     author='Ilya Kreymer',
     author_email='ikreymer@gmail.com',
