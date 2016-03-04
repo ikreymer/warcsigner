@@ -9,9 +9,10 @@ import glob
 long_description = open('README.rst').read()
 
 class PyTest(TestCommand):
+    user_options = []
     def finalize_options(self):
         TestCommand.finalize_options(self)
-        self.test_suite = True
+        self.test_suite = ' '
 
     def run_tests(self):
         import pytest
@@ -24,7 +25,7 @@ class PyTest(TestCommand):
 
 setup(
     name='warcsigner',
-    version='0.3.1',
+    version='0.4.0',
     url='https://github.com/ikreymer/warcsigner',
     author='Ilya Kreymer',
     author_email='ikreymer@gmail.com',

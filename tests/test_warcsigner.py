@@ -93,13 +93,13 @@ class TestWarcSigner(object):
 
     def test_stream(self):
         with tempfile.TemporaryFile() as temp:
-            temp.write('ABC')
+            temp.write(b'ABC')
             assert self.signer.sign(temp) == True
             assert self.signer.verify(temp) == True
 
     def test_stream_noseek(self):
         with tempfile.TemporaryFile() as temp:
-            temp.write('ABCDEF')
+            temp.write(b'ABCDEF')
             assert self.signer.sign(temp) == True
 
             # compute size and reset
@@ -112,8 +112,8 @@ class TestWarcSigner(object):
             buff = BytesIO()
             buff.write(uns.read())
             buff.write(uns.read())
-            assert uns.read() == ''
-            assert buff.getvalue() == 'ABCDEF'
+            assert uns.read() == b''
+            assert buff.getvalue() == b'ABCDEF'
 
             # no seeking in verify
             temp.seek(0)
@@ -134,13 +134,13 @@ class TestWarcSigner(object):
 
             # modify stream
             temp.seek(0)
-            temp.write('X')
+            temp.write(b'X')
             temp.seek(0)
             assert self.signer.verify(temp, size=total_len) == False
 
     def test_unsigned_stream_noseek(self):
         with tempfile.TemporaryFile() as temp:
-            temp.write('ABCDEF' * 30)
+            temp.write(b'ABCDEF' * 30)
 
             # compute size and reset
             temp.seek(0, 2)
@@ -152,7 +152,7 @@ class TestWarcSigner(object):
             buff = BytesIO()
             buff.write(uns.read())
             buff.write(uns.read())
-            assert uns.read() == ''
-            assert buff.getvalue() == ('ABCDEF' * 30)
+            assert uns.read() == b''
+            assert buff.getvalue() == (b'ABCDEF' * 30)
 
 

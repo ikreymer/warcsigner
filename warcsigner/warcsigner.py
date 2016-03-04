@@ -1,4 +1,5 @@
-from gzipmeta import write_metadata, read_metadata, size_of_header
+from __future__ import absolute_import
+from warcsigner.gzipmeta import write_metadata, read_metadata, size_of_header
 
 import rsa
 import math
@@ -38,7 +39,7 @@ class RSAMetadata(object):
         """
         uniq two-byte signature
         """
-        return 'RS'
+        return b'RS'
 
     def size(self):
         """
@@ -69,8 +70,8 @@ class LimitReader(object):
 
     def read(self, length=8192):
         length = min(length, self.limit)
-        if length == 0:
-            return ''
+        if length == 0 or length < -1:
+            return b''
 
         buff = self.stream.read(length)
         self.limit -= len(buff)
@@ -91,13 +92,13 @@ class UnsignedStream(LimitReader):
         # check that remainder is actually a signature
         buff = self.stream.read()
         if not buff:
-            return ''
+            return b''
 
         # if not, just return buff
         if not read_metadata(BytesIO(buff), self.rsa_meta, seek=False):
             return buff
 
-        return ''
+        return b''
 
 
 #=================================================================
@@ -109,14 +110,14 @@ class RSASigner(object):
     """
     def __init__(self, private_key_file=None, public_key_file=None):
         if private_key_file:
-            with open(private_key_file) as priv_fh:
+            with open(private_key_file, 'rb') as priv_fh:
                 priv_data = priv_fh.read()
             self.priv_key = rsa.PrivateKey.load_pkcs1(priv_data)
         else:
             self.priv_key = None
 
         if public_key_file:
-            with open(public_key_file) as pub_fh:
+            with open(public_key_file, 'rb') as pub_fh:
                 pub_data = pub_fh.read()
             self.pub_key = rsa.PublicKey.load_pkcs1(pub_data)
         else:
@@ -129,7 +130,7 @@ class RSASigner(object):
             if not os.path.isfile(file_):
                 return False
 
-            with open(file_, 'a+') as fh:
+            with open(file_, 'a+b') as fh:
                 return self.sign_stream(fh, hash_type)
 
     def sign_stream(self, fh, hash_type):
@@ -154,7 +155,7 @@ class RSASigner(object):
             if not os.path.isfile(file_):
                 return False
 
-            mod = 'r' if not remove else 'a+'
+            mod = 'rb' if not remove else 'a+b'
 
             with open(file_, mod) as fh:
                 return self.verify_stream(fh, remove)
@@ -204,12 +205,19 @@ class RSASigner(object):
 
             return rsa_meta.signature
 
+
+        #signature = read_sig()
+        #if not signature:
+        #    return False
+
         try:
             result = _rsa_streaming_verify(lim, read_sig,
                                            self.pub_key, hash_type)
+            #result = rsa.verify(fh, self.pub_key, signature)
         except VerificationError:
             return False
 
+        print(result)
         return result
 
     def get_unsigned_stream(self, fh, total_len, hash_type=DEFAULT_HASH_TYPE):
@@ -222,44 +230,37 @@ class RSASigner(object):
 
 
 #=================================================================
-def _rsa_streaming_verify(fh, sig_func, pub_key, hash_type):
+def _rsa_streaming_verify(message, sig_func, pub_key, hash_type):
+    """Verifies that the signature matches the message.
+    The hash method is detected automatically from the signature.
+    :param message: the signed message. Can be an 8-bit string or a file-like
+        object. If ``message`` has a ``read()`` method, it is assumed to be a
+        file-like object.
+    :param signature: the signature block, as created with :py:func:`rsa.sign`.
+    :param pub_key: the :py:class:`rsa.PublicKey` of the person signing the message.
+    :raise VerificationError: when the signature doesn't match the message.
+    """
 
     # Compute hash first, using given type
-    message_hash = rsa.pkcs1._hash(fh, hash_type)
+    message_hash = rsa.pkcs1._hash(message, hash_type)
 
-    # Compute signature given sig_func(), presumably
-    # reading rest of stream
     signature = sig_func()
-
     if not signature:
         raise VerificationError('Verification failed')
 
-    # Below is copy of rest of rsa.verify() to check the signature
-    # ------------------------------------------------------------
-    blocksize = rsa.common.byte_size(pub_key.n)
+    keylength = rsa.common.byte_size(pub_key.n)
     encrypted = rsa.transform.bytes2int(signature)
     decrypted = rsa.core.decrypt_int(encrypted, pub_key.e, pub_key.n)
-    clearsig = rsa.transform.int2bytes(decrypted, blocksize)
+    clearsig = rsa.transform.int2bytes(decrypted, keylength)
 
-    # If we can't find the signature  marker, verification failed.
-    if clearsig[0:2] != rsa._compat.b('\x00\x01'):
+    # Reconstruct the expected padded hash
+    cleartext = rsa.pkcs1.HASH_ASN1[hash_type] + message_hash
+    expected = rsa.pkcs1._pad_for_signing(cleartext, keylength)
+
+    # Compare with the signed one
+    if expected != clearsig:
         raise VerificationError('Verification failed')
 
-    # Find the 00 separator between the padding and the payload
-    try:
-        sep_idx = clearsig.index(rsa._compat.b('\x00'), 2)
-    except ValueError:  # pragma: no cover (part of rsa.verify())
-        raise VerificationError('Verification failed')
-
-    # Get the hash method and and signature
-    (actual_hash_type, signature_hash) = (rsa.pkcs1.
-        _find_method_hash(clearsig[sep_idx + 1:]))
-
-    # Compare the real hash to the hash in the signature
-    if message_hash != signature_hash or hash_type != actual_hash_type:
-        raise VerificationError('Verification failed')
-
-    # end rsa.verify() --------------------------------------------
     return True
 
 
@@ -283,9 +284,9 @@ def sign_cli(args=None):
         res = signer.sign(input_)
 
         if res:
-            print 'Signed ', input_
+            print('Signed ', input_)
         else:
-            print 'NOT SIGNED'
+            print('NOT SIGNED')
             errs = True
 
     return 0 if not errs else 1
@@ -315,9 +316,9 @@ def verify_cli(args=None):
         res = signer.verify(input_, remove=cmd.remove is not None)
 
         if res:
-            print 'Verified ', input_
+            print('Verified ', input_)
         else:
-            print 'NOT VERIFIED'
+            print('NOT VERIFIED')
             errs = True
 
     return 0 if not errs else 1

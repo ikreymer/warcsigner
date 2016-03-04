@@ -1,16 +1,18 @@
+from __future__ import absolute_import
+
 import struct
 import time
 import io
 import gzip
 
-MAGIC_HEADER = '\037\213\010'
-FLAGS = '\004'
-XFL_OS = '\000\003'
-EMPTY_DATA = '\003\000'
+MAGIC_HEADER = b'\037\213\010'
+FLAGS = b'\004'
+XFL_OS = b'\000\003'
+EMPTY_DATA = b'\003\000'
 
 
 #=================================================================
-class LengthMetadata:
+class LengthMetadata(object):
     """
     Sample metadata which stores an 8-byte lengtg offset in the gzip header
     Could be used to store an offset
@@ -21,16 +23,16 @@ class LengthMetadata:
         self.length = length
 
     def id(self):
-        return 'LN'
+        return b'LN'
 
     def size(self):
         return 8
 
     def write(self, fh):
-        write64(fh, long(self.length))
+        write64(fh, int(self.length))
 
     def read(self, fh):
-        self.length = long(read64(fh))
+        self.length = int(read64(fh))
 
 
 #=================================================================
@@ -40,7 +42,7 @@ def write_length_metadata(fh, length):
     >>> write_length_metadata(buff, 1234)
 
     Verify block contents
-    >>> buff.getvalue()
+    >>> _to_str(buff.getvalue())
     '\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\x03\x0c\x00LN\x08\x00\xd2\x04\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
     Verify block
@@ -48,7 +50,7 @@ def write_length_metadata(fh, length):
     34
 
     Verify actual block is empty
-    >>> gzip.GzipFile(fileobj=buff).read(64)
+    >>> _to_str(gzip.GzipFile(fileobj=buff).read(64))
     ''
     """
     write_metadata(fh, LengthMetadata(length))
@@ -90,23 +92,23 @@ def write16(fh, value):
 
 
 def read16(input):
-    return struct.unpack("<H", input.read(2))[0]
+    return struct.unpack(b'<H', input.read(2))[0]
 
 
 def write32(fh, value):
-    fh.write(struct.pack(b'<I', long(value)))
+    fh.write(struct.pack(b'<I', int(value)))
 
 # currentl unused
 def read32(input):  # pragma: no cover
-    return struct.unpack("<I", input.read(4))[0]
+    return struct.unpack(b'<I', input.read(4))[0]
 
 
 def write64(fh, value):
-    fh.write(struct.pack(b'<Q', long(value)))
+    fh.write(struct.pack(b'<Q', int(value)))
 
 
 def read64(input):
-    return struct.unpack("<Q", input.read(8))[0]
+    return struct.unpack(b'<Q', input.read(8))[0]
 
 
 #=================================================================
@@ -116,23 +118,23 @@ def read_length_metadata(fh):
     >>> buff = io.BytesIO()
     >>> write_length_metadata(buff, 1234)
     >>> read_length_metadata(buff)
-    1234L
+    1234
 
     write and read 0
     >>> buff = io.BytesIO()
     >>> write_length_metadata(buff, 0)
     >>> read_length_metadata(buff)
-    0L
+    0
 
-    write and read a full long
+    write and read a full int
     >>> buff = io.BytesIO()
     >>> write_length_metadata(buff, 0x7fffffffffffffee)
     >>> hex(read_length_metadata(buff))
-    '0x7fffffffffffffeeL'
+    '0x7fffffffffffffee'
 
     ensure gzip still consistent (empty)
     >>> b = buff.seek(0)
-    >>> gzip.GzipFile(fileobj=buff).read()
+    >>> _to_str(gzip.GzipFile(fileobj=buff).read())
     ''
 
     >>> read_length_metadata('')
@@ -179,6 +181,14 @@ def read_metadata(fh, metadata, seek=True):
 
     except Exception:
         return False
+
+
+#=================================================================
+def _to_str(val):
+    import sys
+    if sys.version_info >= (3,):  #pragma: no cover
+        val = val.decode('latin-1')
+    return val
 
 
 #=================================================================
