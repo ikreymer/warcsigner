@@ -34,7 +34,7 @@ setup(
     license='MIT',
     packages=find_packages(),
     provides=['warcsigner'],
-    install_requires=['rsa'],
+    install_requires=['rsa>=3.3'],
     tests_require=[
         'pytest',
         'pytest-cov',
